@@ -11,7 +11,7 @@
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details. 
+ * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
@@ -445,6 +445,7 @@ struct option long_options[] = {
 	{"shrink-insane", 0, 0, '4'},
 	{"iter", 1, 0, 'i'},
 
+	{"ignore-errors", 0, 0, 'g'},
 	{"verbose", 0, 0, 'v'},
 	{"quiet", 0, 0, 'q'},
 	{"help", 0, 0, 'h'},
@@ -453,7 +454,7 @@ struct option long_options[] = {
 };
 #endif
 
-#define OPTIONS "axztlLNpk01234i:qhV"
+#define OPTIONS "axztlLgvNpk01234i:qhV"
 
 void version()
 {
@@ -481,6 +482,8 @@ void usage()
 	cout << "  " SWITCH_GETOPT_LONG("-4, --shrink-insane ", "-4") "  Compress extreme (zopfli)" << endl;
 	cout << "  " SWITCH_GETOPT_LONG("-i N, --iter=N      ", "-i") "  Compress iterations" << endl;
 	cout << "  " SWITCH_GETOPT_LONG("-k, --keep-file-time", "-k") "  REZIP! Don't alter zip time" << endl;
+	cout << "  " SWITCH_GETOPT_LONG("-g, --ignore-errors ", "-g") "  Don't exit on error; skip to next file" << endl;
+	cout << "  " SWITCH_GETOPT_LONG("-v, --verbose       ", "-v") "  Print more details on the console" << endl;
 	cout << "  " SWITCH_GETOPT_LONG("-q, --quiet         ", "-q") "  Don't print on the console" << endl;
 	cout << "  " SWITCH_GETOPT_LONG("-h, --help          ", "-h") "  Help of the program" << endl;
 	cout << "  " SWITCH_GETOPT_LONG("-V, --version       ", "-V") "  Version of the program" << endl;
@@ -496,6 +499,8 @@ void process(int argc, char* argv[])
 	bool pedantic = false;
 	bool crc = false;
 	bool keep_file_time = false;
+	bool ignore_errors = false;
+	bool verbose = false;
 	shrink_t level;
 
 	level.level = shrink_normal;
@@ -575,6 +580,12 @@ void process(int argc, char* argv[])
 		case 'i':
 			level.iter = atoi(optarg);
 			break;
+		case 'g' :
+			ignore_errors = true;
+			break;
+		case 'v' :
+			verbose = true;
+			break;
 		case 'q' :
 			quiet = true;
 			break;
@@ -590,30 +601,37 @@ void process(int argc, char* argv[])
 			opt = (char)optopt;
 			throw error() << "Unknown option `" << opt << "'";
 			}
-		} 
+		}
 	}
 
 	if (pedantic)
 		zip::pedantic_set(pedantic);
 
-	switch (cmd) {
-	case cmd_recompress :
-		rezip_all(argc - optind, argv + optind, quiet, !notzip, level, keep_file_time);
-		break;
-	case cmd_extract :
-		extract_all(argc - optind, argv + optind, quiet);
-		break;
-	case cmd_add :
-		add_all(argc - optind, argv + optind, quiet, !notzip, level);
-		break;
-	case cmd_test :
-		test_all(argc - optind, argv + optind, quiet);
-		break;
-	case cmd_list :
-		list_all(argc - optind, argv + optind, crc);
-		break;
-	case cmd_unset :
-		throw error() << "No command specified";
+	try {
+        switch (cmd) {
+            case cmd_recompress :
+                rezip_all(argc - optind, argv + optind, quiet, !notzip, level, keep_file_time);
+                break;
+            case cmd_extract :
+                extract_all(argc - optind, argv + optind, quiet);
+                break;
+            case cmd_add :
+                add_all(argc - optind, argv + optind, quiet, !notzip, level);
+                break;
+            case cmd_test :
+                test_all(argc - optind, argv + optind, quiet);
+                break;
+            case cmd_list :
+                list_all(argc - optind, argv + optind, crc);
+                break;
+            case cmd_unset :
+                throw error() << "No command specified";
+        }
+    } catch (error& e) {
+	    if (!ignore_errors) {
+	        throw e;
+	    }
+	    cout << e << endl;
 	}
 }
 
